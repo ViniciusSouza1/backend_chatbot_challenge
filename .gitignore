@@ -1,0 +1,111 @@
+# === Python ===
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+.eggs/
+build/
+dist/
+wheels/
+*.spec
+*.manifest
+*.log
+*.tmp
+*.bak
+*.swp
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# === Virtual environments ===
+.venv/
+venv/
+env/
+ENV/
+*.env
+*.venv
+
+# === FastAPI / Uvicorn / Gunicorn ===
+*.db
+*.sqlite3
+*.pid
+*.log
+*.sock
+
+# === IDE / Editor configs ===
+.vscode/
+.idea/
+*.iml
+*.sublime-project
+*.sublime-workspace
+
+# === Environment and secret files ===
+.env
+.env.local
+.env.*.local
+*.secret
+*.key
+*.pem
+*.crt
+*.csr
+
+# === Cache & Temp ===
+*.cache/
+.cache/
+*.pytest_cache/
+pytest_cache/
+*.mypy_cache/
+.mypy_cache/
+*.ruff_cache/
+__pypackages__/
+.coverage
+coverage.xml
+htmlcov/
+logs/
+*.log
+tmp/
+temp/
+*.tmp
+*.bak
+*.swp
+
+# === Jupyter / Notebooks ===
+.ipynb_checkpoints/
+*.ipynb
+
+# === OS-specific ===
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# === Project-specific ===
+# compiled migrations, runtime data, test outputs
+*.jsonl
+*.csv
+*.tsv
+*.dat
+*.db
+*.sqlite
+*.h5
+*.pkl
+*.model
+*.ckpt
+
+# === Node/Nuxt (if frontend or docs preview exists) ===
+node_modules/
+.nuxt/
+dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# === Local configuration ===
+*.local
+*.config
+*.bak
