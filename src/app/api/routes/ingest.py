@@ -2,6 +2,7 @@
 from fastapi import APIRouter, Query
 from typing import Optional, List, Dict, Any
 import traceback
+from app.api.routes.debug import _to_plain, _coerce_dict
 
 from app.services.vector_client import pc, PINECONE_HOST, NAMESPACE, embed_query
 from app.api.routes.debug import _to_plain, _coerce_dict, _safe_get_dimension
@@ -63,15 +64,32 @@ def ingest_faq(
         # Sanity check: simple query
         test_vec = _adjust_to_dim(embed_query("How do I create an account?"), target_dim)
         qr = idx.query(vector=test_vec, top_k=5, include_metadata=True, namespace=ns)
+
         qr_plain = _to_plain(qr)
-        matches = qr_plain.get("matches", []) or []
+        qr_d = _coerce_dict(qr_plain)
+        matches = qr_d.get("matches", []) or []
+
+        # Safe preview (dict or object)
         preview = []
         for m in matches:
             if isinstance(m, dict):
+                md = m.get("metadata") or {}
                 preview.append({
                     "id": m.get("id"),
                     "score": m.get("score"),
-                    "category": (m.get("metadata") or {}).get("category")
+                    "category": md.get("category")
+                })
+            else:
+                # fallback with objects attributes
+                mid = getattr(m, "id", None)
+                mscore = getattr(m, "score", None)
+                mmeta = getattr(m, "metadata", {}) or {}
+                if not isinstance(mmeta, dict):
+                    mmeta = _coerce_dict(_to_plain(mmeta))
+                preview.append({
+                    "id": mid,
+                    "score": mscore,
+                    "category": (mmeta or {}).get("category")
                 })
 
         return {
