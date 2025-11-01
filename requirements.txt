@@ -2,6 +2,5 @@ fastapi==0.115.0
 uvicorn[standard]==0.30.6
 pydantic==2.8.2
 python-dotenv==1.0.1
-openai==1.50.2
-pinecone-client==2.2.4
+pinecone=>3.0.0
 python-dotenv==1.0.1

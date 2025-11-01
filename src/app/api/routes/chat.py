@@ -12,11 +12,7 @@ def get_history(sessionId: str):
 
 @router.post("/chat", response_model=ChatHistoryResponse)
 def chat(req: ChatRequest):
-    # save user message
     store.append_message(req.sessionId, ChatMessage(role="user", content=req.message))
-    # generate response (stub now, RAG after)
-    reply = chat_service.build_stub_reply(req.message)
+    reply = chat_service.answer_with_rag(req.message)
     store.append_message(req.sessionId, reply)
-    # retorn full history
-    return ChatHistoryResponse(sessionId=req.sessionId,
-                               messages=store.get_history(req.sessionId))
+    return ChatHistoryResponse(sessionId=req.sessionId, messages=store.get_history(req.sessionId))

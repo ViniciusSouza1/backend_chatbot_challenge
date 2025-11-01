@@ -13,5 +13,5 @@ class InMemoryStore:
         history.append(message)
         return history
 
-# instância única para o app (simples p/ teste)
+# instance singleton just for test to test
 store = InMemoryStore()
