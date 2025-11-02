@@ -4,3 +4,5 @@ pydantic==2.8.2
 python-dotenv==1.0.1
 pinecone=>3.0.0
 python-dotenv==1.0.1
+SQLAlchemy==2.0.44
+pydantic[email]==2.8.2

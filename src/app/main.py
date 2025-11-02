@@ -1,7 +1,15 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
-from app.api.routes import health, chat, debug, ingest
+from app.api.routes import (
+    health,
+    chat,
+    debug,
+    ingest,
+    users,
+    sessions,
+    messages,
+)
 
 app = FastAPI(title=settings.api_name)
 
@@ -17,5 +25,8 @@ app.add_middleware(
 # Rotas
 app.include_router(health.router)
 app.include_router(chat.router)
+app.include_router(users.router)
+app.include_router(sessions.router)
+app.include_router(messages.router)
 app.include_router(ingest.router)
 app.include_router(debug.router)

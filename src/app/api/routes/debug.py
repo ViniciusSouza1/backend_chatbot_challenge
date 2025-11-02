@@ -3,7 +3,7 @@ from app.services.vector_client import (
     search, EMBED_MODEL, PINECONE_HOST, NAMESPACE, index, embed_query, pc,
     INDEX_DIM, adjust_dim
 )
-from typing import Optional, Any, List, Dict
+from typing import Optional, Any
 from fastapi.responses import JSONResponse
 import traceback
 
@@ -54,8 +54,8 @@ def pinecone_raw(
     """
     try:
         # Generate embedding for the given query
-        vec_raw = embed_query(q)                       # geralmente 1024
-        vec = adjust_dim(vec_raw, INDEX_DIM)           # vira 1536
+        vec_raw = embed_query(q)                       # usually 1024
+        vec = adjust_dim(vec_raw, INDEX_DIM)           # turn 1536
 
         # Build query parameters
         kwargs = {"vector": vec, "top_k": top_k, "include_metadata": True}
@@ -105,7 +105,7 @@ def pinecone_raw(
 @router.get("/debug/pinecone-stats")
 def pinecone_stats():
     try:
-        idx = pc.Index(host=PINECONE_HOST)  # use o mesmo host já configurado
+        idx = pc.Index(host=PINECONE_HOST)  # same host configured
         stats = idx.describe_index_stats()
         # Resumo amigável
         ns = stats.get("namespaces", {}) or {}
@@ -113,13 +113,10 @@ def pinecone_stats():
         return {
             "total_vector_count": total,
             "namespaces": {k: v.get("vector_count", 0) for k, v in ns.items()},
-            "dimension": stats.get("dimension"),  # útil p/ conferir com seu embedder
+            "dimension": stats.get("dimension"),  # confirm embedder
         }
     except Exception as e:
         return {"error": str(e)}
-    
-# src/app/api/routes/debug.py
-
 
 def _coerce_dict(x: Any) -> dict:
     """
@@ -142,7 +139,7 @@ def _safe_get_dimension(stats: Any, default: int = 1536) -> int:
     Try to extract all dimension info from stats. return default if fails.
     """
     try:
-        # Se stats é uma string que parece dict, tenta converter
+        # convert
         if isinstance(stats, str) and stats.strip().startswith('{'):
             try:
                 import ast
@@ -152,7 +149,7 @@ def _safe_get_dimension(stats: Any, default: int = 1536) -> int:
             except:
                 pass
         
-        # Tenta como dict normal
+        # try dict normal
         d = _coerce_dict(stats)
         if 'dimension' in d:
             return int(d['dimension'])
@@ -160,7 +157,7 @@ def _safe_get_dimension(stats: Any, default: int = 1536) -> int:
     except Exception as e:
         print(f"DEBUG - Error extracting dimension: {e}")
     
-    return default  # Agora default é 1536, já que sabemos do índice
+    return default  # default 1536
 
 def _to_plain(x: Any) -> Any:
     """
@@ -175,7 +172,7 @@ def _to_plain(x: Any) -> Any:
     if isinstance(x, dict):
         return {k: _to_plain(v) for k, v in x.items()}
 
-    # Tentativas para Pydantic v2 e v1
+    # Try for Pydantic v2 e v1
     for attr in ("model_dump", "dict"):
         fn = getattr(x, attr, None)
         if callable(fn):
@@ -184,7 +181,7 @@ def _to_plain(x: Any) -> Any:
             except Exception:
                 pass
 
-    # Tentativa via JSON do Pydantic v2
+    # Try via JSON of Pydantic v2
     fn_json = getattr(x, "model_dump_json", None)
     if callable(fn_json):
         try:
@@ -193,7 +190,6 @@ def _to_plain(x: Any) -> Any:
         except Exception:
             pass
 
-    # Último recurso: transforma em string (pelo menos é serializável)
     return str(x)
 
 
@@ -216,14 +212,14 @@ def pinecone_smoke():
         stats_raw = idx.describe_index_stats()
         stats = _to_plain(stats_raw)
         
-        # DEBUG: Veja a estrutura real
+        # DEBUG: Structure
         print("=== DEBUG STATS STRUCTURE ===")
         print(stats)
         print("=============================")
         
-        dim = _safe_get_dimension(stats, 1536)  # Agora default é 1536
+        dim = _safe_get_dimension(stats, 1536)  # default 1536
 
-        # 2) Upsert 1 vetor
+        # 2) Upsert 1 vector
         vec = [0.001 * i for i in range(dim)]
         ns = NAMESPACE or "default"
         
@@ -252,7 +248,6 @@ def pinecone_smoke():
             if isinstance(m, dict):
                 top.append({"id": m.get("id"), "score": m.get("score")})
             else:
-                # fallback: tenta atributos
                 top.append({
                     "id": getattr(m, "id", None),
                     "score": getattr(m, "score", None)
