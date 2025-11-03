@@ -6,3 +6,8 @@ pinecone=>3.0.0
 python-dotenv==1.0.1
 SQLAlchemy==2.0.44
 pydantic[email]==2.8.2
+
+# JWT e hashing
+PyJWT>=2.8.0,<3.0.0
+cryptography>=41.0.0
+passlib[bcrypt]>=1.7.4
