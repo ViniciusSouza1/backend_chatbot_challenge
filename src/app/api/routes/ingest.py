@@ -1,12 +1,13 @@
 # src/app/api/routes/ingest.py
-from fastapi import APIRouter, Query
-from typing import Optional, List, Dict, Any
+from fastapi import APIRouter, Query, Depends
+from typing import List
 import traceback
 from app.api.routes.debug import _to_plain, _coerce_dict
 
 from app.services.vector_client import pc, PINECONE_HOST, NAMESPACE, embed_query
 from app.api.routes.debug import _to_plain, _coerce_dict, _safe_get_dimension
 from app.data.faq_seed import FAQ_ENTRIES
+from app.api.deps.permissions import require_admin, User
 
 router = APIRouter(prefix="/api/ingest", tags=["ingest"])
 
@@ -22,8 +23,9 @@ def _adjust_to_dim(vec: List[float], target: int) -> List[float]:
 
 @router.post("/faq")
 def ingest_faq(
-    namespace: Optional[str] = Query(None, description="Target namespace (optional)"),
+    namespace: str | None = Query(None),
     batch_size: int = Query(32, ge=1, le=100),
+    _: User = Depends(require_admin),
 ):
     """
     🚀 Ingests the synthetic FAQ dataset into Pinecone.

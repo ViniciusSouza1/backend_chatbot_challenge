@@ -8,7 +8,7 @@ It supports both **guest sessions** (no login required) and **registered users**
 
 ## 🧩 Tech Stack
 
-- **Python 3.10+**
+- **Python 3.11+**
 - **FastAPI** — high-performance REST framework  
 - **SQLAlchemy ORM** — SQLite database layer  
 - **Pinecone** — vector similarity search for FAQ retrieval  
@@ -16,6 +16,8 @@ It supports both **guest sessions** (no login required) and **registered users**
 - **Pydantic** — request/response validation  
 - **Uvicorn** — ASGI server for production and development  
 - **Gunicorn** — optional for multi-worker deployment  
+- **JWT Authentication** — user sessions and authorization  
+- **Docker-ready** — easy deployment in production
 
 ---
 
@@ -59,6 +61,12 @@ DEBUG_RAW_MATCHES=true
 
 # === RAG Parameters ===
 RAG_CONFIDENCE_THRESHOLD=0.25
+
+# === Auth ===
+JWT_SECRET=super_secret_key
+JWT_ALGORITHM=HS256
+JWT_EXP_MINUTES=60
+ADMIN_EMAILS=admin@example.com
 ```
 
 > ⚠️ `.env` contains sensitive credentials — it’s ignored by `.gitignore`.
@@ -80,26 +88,65 @@ gunicorn app.main:app -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000 --wor
 
 ---
 
-## 🧠 FAQ Vector Ingestion (Pinecone Seed)
+## 🐳 Docker Deployment (Production)
 
-Before using `/api/chat`, ingest FAQ data into Pinecone:
+A lightweight Dockerfile is included for production builds:
+
+```dockerfile
+FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \\
+    PYTHONUNBUFFERED=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends \\
+    build-essential libffi-dev libssl-dev curl \\
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+
+EXPOSE 8000
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+```
+
+### Build & Run
 
 ```bash
-curl -X POST "http://127.0.0.1:8000/api/ingest/faq"
+docker build -t eloquent-chat-api .
+docker run -d -p 8000:8000 --env-file .env eloquent-chat-api
 ```
 
-Example response:
-```json
-{
-  "ok": true,
-  "namespace_used": "default",
-  "index_dim": 1536,
-  "ingested_count": 20,
-  "preview_matches_for_create_account": [
-    {"id": "acc-001", "score": 0.87, "category": "Account & Registration"}
-  ]
-}
+---
+
+## 🔐 Authentication & Authorization
+
+The API supports **JWT-based authentication** for registered users while maintaining **guest access** for unauthenticated sessions.
+
+### Auth Flow
+
+| Endpoint | Method | Auth | Description |
+|-----------|---------|------|-------------|
+| `/api/auth/register` | POST | ❌ | Create a new user |
+| `/api/auth/login` | POST | ❌ | Obtain JWT token |
+| `/api/auth/me` | GET | ✅ | Return the authenticated user's info |
+
+**JWT Example:**
+```http
+Authorization: Bearer <access_token>
 ```
+
+### Admin Access
+Set `ADMIN_EMAILS` in `.env` to define privileged accounts:
+```
+ADMIN_EMAILS=admin@example.com,burce@eloquent.ai
+```
+
+Admins can:
+- List all users (`/api/users`)
+- Access debug endpoints
+- Manage all sessions and messages
 
 ---
 
@@ -133,50 +180,59 @@ Response:
 
 ## 🧑‍💻 Users, Sessions, and Messages
 
-The application now includes **persistent storage** for users and chat sessions.
+The application includes **persistent storage** for users and chat sessions, supporting both **guest** and **registered** usage.
 
 ### **Users**
 | Method | Endpoint | Description |
 |---------|-----------|-------------|
-| `GET` | `/api/users` | List all users |
+| `GET` | `/api/users` | List all users (Admin only) |
 | `POST` | `/api/users` | Create a new user |
-
-#### Example: Create User
-```bash
-curl -X POST http://127.0.0.1:8000/api/users   -H "Content-Type: application/json"   -d '{"email": "john@example.com", "password": "123456"}'
-```
 
 ---
 
 ### **Sessions**
-| Method | Endpoint | Description |
-|---------|-----------|-------------|
-| `GET` | `/api/sessions` | List all sessions |
-| `GET` | `/api/sessions/by-user/{user_id}` | List sessions by user |
-| `POST` | `/api/sessions` | Create new session (user optional) |
+| Method | Endpoint | Auth | Description |
+|---------|-----------|------|-------------|
+| `GET` | `/api/sessions` | ✅ (Admin) | List all sessions |
+| `GET` | `/api/sessions/by-user/{user_id}` | ✅ (Self/Admin) | List sessions by user |
+| `POST` | `/api/sessions` | ✅/❌ | Create session (guest or user) |
+| `POST` | `/api/sessions/claim` | ✅ | Link guest sessions to a logged-in user |
 
 #### Example: Create Guest Session
 ```bash
 curl -X POST http://127.0.0.1:8000/api/sessions   -H "Content-Type: application/json"   -d '{"title": "Guest chat"}'
 ```
 
-#### Example: Create Session for User
+#### Example: Claim Sessions after Login
 ```bash
-curl -X POST http://127.0.0.1:8000/api/sessions   -H "Content-Type: application/json"   -d '{"user_id": "USER-UUID", "title": "My first chat"}'
+curl -X POST http://127.0.0.1:8000/api/sessions/claim   -H "Authorization: Bearer <token>"   -H "Content-Type: application/json"   -d '{"sessionIds": ["sess_123", "sess_456"]}'
 ```
 
 ---
 
 ### **Messages**
-| Method | Endpoint | Description |
-|---------|-----------|-------------|
-| `GET` | `/api/messages` | List all messages |
-| `GET` | `/api/messages/by-session/{session_id}` | Get messages for one session |
-| `POST` | `/api/messages` | Create message manually (role=user/assistant) |
+| Method | Endpoint | Auth | Description |
+|---------|-----------|------|-------------|
+| `GET` | `/api/messages` | ✅ (Admin) | List all messages |
+| `GET` | `/api/messages/by-session/{session_id}` | ✅/❌ | Guest allowed if session is anonymous |
+| `POST` | `/api/messages` | ✅/❌ | Guest allowed if session is anonymous |
 
-#### Example: Create Message
+---
+
+### **Chat API**
+| Method | Endpoint | Auth | Description |
+|---------|-----------|------|-------------|
+| `POST` | `/api/chat` | ✅/❌ | Send message (guest or authenticated) |
+| `GET` | `/api/history` | ✅/❌ | Retrieve session chat history |
+
+---
+
+## 🧠 FAQ Vector Ingestion (Pinecone Seed)
+
+Before using `/api/chat`, ingest FAQ data into Pinecone:
+
 ```bash
-curl -X POST http://127.0.0.1:8000/api/messages   -H "Content-Type: application/json"   -d '{"session_id": "SESSION-UUID", "role": "user", "content": "Hello"}'
+curl -X POST "http://127.0.0.1:8000/api/ingest/faq"
 ```
 
 ---
@@ -191,59 +247,17 @@ The environment variable `RAG_CONFIDENCE_THRESHOLD` controls the minimum similar
 | `0.15` | More permissive, can include weak matches |
 | `0.35+` | More strict, filters vague answers |
 
-If no match passes the threshold, the chatbot responds:
-> “I couldn’t find a sufficiently relevant answer in the FAQ…”
-
 ---
 
 ## 🔍 Debug & Maintenance Endpoints
 
-| Endpoint | Method | Purpose |
-|-----------|---------|---------|
-| `/debug/stats` | `GET` | View total vectors and dimensions |
-| `/debug/pinecone` | `GET` | Run manual query to inspect matches |
-| `/debug/pinecone-raw` | `GET` | Get raw Pinecone query response |
-| `/debug/pinecone-smoke` | `POST` | Test upsert/query connection |
-| `/api/ingest/faq` | `POST` | Load FAQ dataset into Pinecone |
-
----
-
-## 🏗️ Project Structure
-
-```
-src/
- ├── app/
- │   ├── api/
- │   │   ├── routes/
- │   │   │   ├── chat.py
- │   │   │   ├── users.py
- │   │   │   ├── sessions.py
- │   │   │   ├── messages.py
- │   │   │   ├── ingest.py
- │   │   │   ├── debug.py
- │   │   │   └── health.py
- │   ├── core/
- │   │   └── config.py
- │   ├── db/
- │   │   ├── dependencies.py
- │   │   ├── session.py
- │   │   └── __init__.py
- │   ├── domain/
- │   │   ├── models/
- │   │   │   ├── base.py
- │   │   │   ├── entities.py
- │   │   │   └── __init__.py
- │   │   └── schemas.py
- │   ├── repositories/
- │   │   ├── db.py
- │   │   └── memory.py
- │   ├── services/
- │   │   ├── chat_service.py
- │   │   └── vector_client.py
- │   └── main.py
- └── data/
-     └── app.db
-```
+| Endpoint | Method | Purpose | Access |
+|-----------|---------|---------|--------|
+| `/debug/stats` | `GET` | View Pinecone stats | Admin |
+| `/debug/pinecone` | `GET` | Run manual vector query | Admin |
+| `/debug/pinecone-raw` | `GET` | Inspect raw Pinecone response | Admin |
+| `/debug/pinecone-smoke` | `POST` | Test index connection | Admin |
+| `/api/ingest/faq` | `POST` | Load FAQ dataset | Admin |
 
 ---
 
@@ -258,18 +272,26 @@ Each `Session` belongs to a `User` (optional), and contains multiple `Message` e
 
 ---
 
+## 🩺 Health Check
+
+You can check service status using:
+```bash
+curl http://localhost:8000/health
+```
+
+---
+
 ## 🏭 Production Readiness Checklist
 
 | Area | Description | Status |
 |------|--------------|--------|
-| CORS & API Name | Configurable via `.env` | ✅ |
-| Pinecone | Integrated via environment variables | ✅ |
-| Database | SQLite with automatic folder creation | ✅ |
+| JWT Auth | Implemented (guest + user) | ✅ |
 | Guest Sessions | Allowed (no user_id required) | ✅ |
-| Persistent History | Messages stored in DB | ✅ |
-| RAG Filtering | Configurable via `RAG_CONFIDENCE_THRESHOLD` | ✅ |
+| Session Claim | Update guest sessions after signup | ✅ |
+| Pinecone | Integrated via environment variables | ✅ |
+| Database | SQLite with ORM | ✅ |
 | Logging | Configurable verbosity | ✅ |
-| Security | `.env` excluded from git | ✅ |
+| Docker | Lightweight slim image | ✅ |
 | Docs | Swagger at `/docs` | ✅ |
 
 ---

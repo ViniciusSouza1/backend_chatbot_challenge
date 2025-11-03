@@ -66,3 +66,15 @@ class LoginResponse(BaseModel):
 class UserPublic(BaseModel):
     id: str
     email: EmailStr
+
+
+class ClaimSessionsRequest(BaseModel):
+    sessionIds: List[str] = Field(..., min_items=1, description="Lista de sessionIds criadas como guest")
+
+class ClaimSessionsResponse(BaseModel):
+    claimed: int
+    already_owned_by_user: int
+    owned_by_another_user: int
+    not_found: int
+    processed: int
+    details: List[dict]  # opcional para debug/telemetria no front

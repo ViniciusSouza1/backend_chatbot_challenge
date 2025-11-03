@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Query, HTTPException
+from fastapi import APIRouter, Query, HTTPException, Depends
 from app.services.vector_client import (
     search, EMBED_MODEL, PINECONE_HOST, NAMESPACE, index, embed_query, pc,
     INDEX_DIM, adjust_dim
@@ -6,9 +6,13 @@ from app.services.vector_client import (
 from typing import Optional, Any
 from fastapi.responses import JSONResponse
 import traceback
+from app.api.deps.permissions import require_admin
 
 
-router = APIRouter(prefix="/debug")
+router = APIRouter(
+    prefix="/debug",
+    dependencies=[Depends(require_admin)],  # <- TODAS as rotas exigem admin
+)
 
 
 @router.get("/pinecone")
